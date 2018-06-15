@@ -1,8 +1,7 @@
 bin/
 *.sublime*
+*.exe
+*.conf
+debug*
 meow-proxy
 MEOW
-MEOW.exe
-direct.txt
-rc.txt
-rc-full.txt
