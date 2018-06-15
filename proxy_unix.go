@@ -1,20 +1,20 @@
-// +build darwin freebsd linux netbsd openbsd
+// +build !windows
 
 package main
 
 import (
-	"os"
 	"net"
+	"os"
 	"syscall"
 )
 
 func isErrConnReset(err error) bool {
-        if ne, ok := err.(*net.OpError); ok {
-                if se, seok := ne.Err.(*os.SyscallError); seok {
-                        return se.Err == syscall.ECONNRESET
-                }
-        }
-        return false
+	if ne, ok := err.(*net.OpError); ok {
+		if se, seok := ne.Err.(*os.SyscallError); seok {
+			return se.Err == syscall.ECONNRESET
+		}
+	}
+	return false
 }
 
 func isDNSError(err error) bool {

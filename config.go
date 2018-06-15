@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	version           = "1.5"
+	version           = "1.6.dev"
 	defaultListenAddr = "127.0.0.1:4411"
 )
 
+// LoadBalanceMode LB mode
 type LoadBalanceMode byte
 
 const (
@@ -28,6 +29,7 @@ const (
 	loadBalanceLatency
 )
 
+// Config all items from config files
 type Config struct {
 	RcFile      string // config file
 	LogFile     string // path for log file
@@ -122,6 +124,7 @@ func parseCmdLineConfig() *Config {
 	return &c
 }
 
+// convert string to bool
 func parseBool(v, msg string) bool {
 	switch v {
 	case "true":

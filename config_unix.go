@@ -1,21 +1,19 @@
-// +build darwin freebsd linux netbsd openbsd
+// +build !windows
 
 package main
 
-import (
-	"path"
-)
-
 const (
-	rcFname      = "rc"
-	directFname  = "direct"
-	proxyFname   = "proxy"
-	rejectFname  = "reject"
-	CNIPFname    = "china_ip_list"
+	rcFname     = "rc.conf"
+	directFname = "direct.conf"
+	proxyFname  = "proxy.conf"
+	rejectFname = "reject.conf"
+	CNIPFname   = "china_ip_list.conf"
 
 	newLine = "\n"
 )
 
 func getDefaultRcFile() string {
-	return path.Join(path.Join(getUserHomeDir(), ".meow", rcFname))
+	//return path.Join(path.Join(getUserHomeDir(), ".meow", rcFname))
+
+	return rcFname
 }

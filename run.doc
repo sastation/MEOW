@@ -1,0 +1,7 @@
+# running on windows
+1. go build -o meow.exe && meow.exe
+2. go run auth.go chinaip_data.go chinaip_init.go config.go config_windows.go conn_pool.go directip.go directlist.go error.go http.go log.go main.go pac.go parent_proxy.go proxy.go proxy_windows.go ssh.go stat.go timeoutset.go util.go
+
+# running on unix
+1. go run *.go
+2. go run auth.go chinaip_data.go chinaip_init.go config.go config_unix.go conn_pool.go directip.go directlist.go error.go http.go log.go main.go pac.go parent_proxy.go proxy.go proxy_unix.go ssh.go stat.go timeoutset.go util.go

@@ -1,22 +1,22 @@
+// +build windows
+
 package main
 
-import (
-	"os"
-	"path"
-)
-
 const (
-	rcFname      = "rc.txt"
-	directFname  = "direct.txt"
-	proxyFname   = "proxy.txt"
-	rejectFname  = "reject.txt"
-	CNIPFname    = "china_ip_list.txt"
+	rcFname     = "rc.conf"
+	directFname = "direct.conf"
+	proxyFname  = "proxy.conf"
+	rejectFname = "reject.conf"
+	// CNIPFname is china ip list
+	CNIPFname = "china_ip_list.conf"
 
 	newLine = "\r\n"
 )
 
 func getDefaultRcFile() string {
-	// On windows, put the configuration file in the same directory of meow executable
+	// put the configuration file in the same directory of meow executable
 	// This is not a reliable way to detect binary directory, but it works for double click and run
-	return path.Join(path.Dir(os.Args[0]), rcFname)
+	// return path.Join(path.Dir(os.Args[0]), rcFname)
+
+	return rcFname
 }
