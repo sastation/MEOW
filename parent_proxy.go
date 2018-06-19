@@ -36,6 +36,9 @@ type ParentPool interface {
 // parent proxies.
 var parentProxy ParentPool = &backupParentPool{}
 
+// David, 2018/5/30, 直连代理对象: directProxy
+var directProxy ParentPool = &backupParentPool{}
+
 func initParentPool() {
 	backPool, ok := parentProxy.(*backupParentPool)
 	if !ok {

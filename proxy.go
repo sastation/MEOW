@@ -325,6 +325,9 @@ func dbgPrintRq(c *clientConn, r *Request, direct bool) {
 		var connType string
 		if direct {
 			connType = "DIRECT"
+			if config.useDProxy {
+				connType = "DProxy"
+			}
 		} else {
 			connType = "PROXY"
 		}
@@ -673,11 +676,19 @@ func (c *clientConn) connect(r *Request, direct bool) (srvconn net.Conn, err err
 	var errMsg string
 
 	if direct {
-		dbgPrintRq(c, r, true)
-		if srvconn, err = connectDirect(r.URL); err == nil {
-			return
+		if config.useDProxy { // 使用直连代理
+			dbgPrintRq(c, r, true)
+			if srvconn, err = directProxy.connect(r.URL); err == nil {
+				return
+			}
+			errMsg = genErrMsg(r, nil, "directProxy connection failed.")
+		} else { // 直连
+			dbgPrintRq(c, r, true)
+			if srvconn, err = connectDirect(r.URL); err == nil {
+				return
+			}
+			errMsg = genErrMsg(r, nil, "Parent proxy connection failed.")
 		}
-		errMsg = genErrMsg(r, nil, "Direct connection failed.")
 		goto fail
 	}
 

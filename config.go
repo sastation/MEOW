@@ -32,9 +32,11 @@ const (
 
 // Config all items from config files
 type Config struct {
-	RcFile      string // config file
-	LogFile     string // path for log file
-	JudgeByIP   bool
+	RcFile    string // config file
+	LogFile   string // path for log file
+	JudgeByIP bool
+	useDProxy bool // Direct path use proxy, default false
+
 	LoadBalance LoadBalanceMode // select load balance mode
 
 	// authenticate client
@@ -179,6 +181,41 @@ func isUserPasswdValid(val string) bool {
 	return true
 }
 
+// David, 2018-5-31, 处理 directProxy 的方法集
+// directProxy Parser methods
+type dproxyParser struct{}
+
+func (p dproxyParser) DProxySocks5(val string) {
+	if err := checkServerAddr(val); err != nil {
+		Fatal("parent socks server", err)
+	}
+	directProxy.add(newSocksParent(val))
+}
+
+func (p dproxyParser) DProxyHttp(val string) {
+	var userPasswd, server string
+
+	idx := strings.LastIndex(val, "@")
+	if idx == -1 {
+		server = val
+	} else {
+		userPasswd = val[:idx]
+		server = val[idx+1:]
+	}
+
+	if err := checkServerAddr(server); err != nil {
+		Fatal("parent http server", err)
+	}
+
+	config.saveReqLine = true
+
+	parent := newHttpParent(server)
+	parent.initAuth(userPasswd)
+	directProxy.add(parent)
+}
+
+// David, 2108-5-31 END
+
 // proxyParser provides functions to parse different types of parent proxy
 // proxyParser 解析各种上层代理的方法集合类
 type proxyParser struct{}
@@ -290,6 +327,31 @@ func (lp listenParser) ListenHttp(val string, proto string) {
 // configParser provides functions to parse options in config file.
 // 处理 rcFile 中参数的方法集
 type configParser struct{}
+
+// David, 2018-5-31, 处理 directProxy 选项
+// 使用反射方式对 rcFile 中的 DProxy 项进行处理
+func (p configParser) ParseDProxy(val string) {
+	parser := reflect.ValueOf(dproxyParser{})
+	zeroMethod := reflect.Value{}
+
+	arr := strings.Split(val, "://")
+	if len(arr) != 2 {
+		Fatal("proxy has no protocol specified:", val)
+	}
+	protocol := arr[0]
+
+	methodName := "DProxy" + strings.ToUpper(protocol[0:1]) + protocol[1:]
+	method := parser.MethodByName(methodName)
+	if method == zeroMethod {
+		Fatalf("no such protocol \"%s\"\n", arr[0])
+	}
+	args := []reflect.Value{reflect.ValueOf(arr[1])}
+	method.Call(args)
+
+	config.useDProxy = true
+}
+
+// David, 2018-5-31 END
 
 // 使用反射方式对 rcFile 中的 proxy=(val) 项进行处理
 func (p configParser) ParseProxy(val string) {
