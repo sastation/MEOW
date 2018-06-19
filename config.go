@@ -15,8 +15,9 @@ import (
 	"github.com/cyfdecyf/bufio"
 )
 
+// 版本号、默认监听端口
 const (
-	version           = "1.5.2"
+	version           = "1.5.2.3-dev"
 	defaultListenAddr = "127.0.0.1:4411"
 )
 
@@ -58,6 +59,7 @@ type Config struct {
 
 	// not configurable in config file
 	PrintVer bool
+	IPv6     bool
 
 	// not config option
 	saveReqLine bool // for http and meow parent, should save request line from client
@@ -72,6 +74,7 @@ func printVersion() {
 	fmt.Println("MEOW version", version)
 }
 
+// Config 内容的初始化，基于 rcFile
 func initConfig(rcFile string) {
 	config.dir = path.Dir(rcFile)
 	config.DirectFile = path.Join(config.dir, directFname)
@@ -92,16 +95,23 @@ func parseCmdLineConfig() *Config {
 	var c Config
 	var listenAddr string
 
-	flag.StringVar(&c.RcFile, "rc", "", "config file, defaults to $HOME/.meow/rc on Unix, ./rc.txt on Windows")
-	// Specifying listen default value to StringVar would override config file options
-	flag.StringVar(&listenAddr, "listen", "", "listen address, disables listen in config")
-	flag.IntVar(&c.Core, "core", 2, "number of cores to use")
-	flag.StringVar(&c.LogFile, "logFile", "", "write output to file")
+	flag.StringVar(&c.RcFile, "rc", "", "config file, defaults to ./rc.conf")
 	flag.BoolVar(&c.PrintVer, "version", false, "print version")
-	flag.StringVar(&c.Cert, "cert", "", "cert for local https proxy")
-	flag.StringVar(&c.Key, "key", "", "key for local https proxy")
+	flag.BoolVar(&config.IPv6, "ipv6", false, "Enable IPv6 proxy (default false)")
+
+	// Specifying listen default value to StringVar would override config file options
+	// flag.StringVar(&listenAddr, "listen", "", "listen address, disables listen in config")
+	// flag.IntVar(&c.Core, "core", 2, "number of cores to use")
+	// flag.StringVar(&c.LogFile, "logFile", "", "write output to file")
+	// flag.StringVar(&c.Cert, "cert", "", "cert for local https proxy")
+	// flag.StringVar(&c.Key, "key", "", "key for local https proxy")
 
 	flag.Parse()
+
+	if c.PrintVer {
+		printVersion()
+		os.Exit(0)
+	}
 
 	if c.RcFile == "" {
 		c.RcFile = getDefaultRcFile()
@@ -225,6 +235,7 @@ func (p proxyParser) ProxyHttps(val string) {
 }
 
 // Parse method:passwd@server:port
+// 处理 method:passwd@server:port 格式 (何处使用？)
 func parseMethodPasswdServer(val string) (method, passwd, server string, err error) {
 	// Use the right-most @ symbol to seperate method:passwd and server:port.
 	idx := strings.LastIndex(val, "@")
@@ -251,6 +262,7 @@ func parseMethodPasswdServer(val string) (method, passwd, server string, err err
 }
 
 // listenParser provides functions to parse different types of listen addresses
+// 各种监听参数处理的方法集合，目前只支持 http 方法
 type listenParser struct{}
 
 func (lp listenParser) ListenHttp(val string, proto string) {
@@ -276,8 +288,10 @@ func (lp listenParser) ListenHttp(val string, proto string) {
 }
 
 // configParser provides functions to parse options in config file.
+// 处理 rcFile 中参数的方法集
 type configParser struct{}
 
+// 使用反射方式对 rcFile 中的 proxy=(val) 项进行处理
 func (p configParser) ParseProxy(val string) {
 	parser := reflect.ValueOf(proxyParser{})
 	zeroMethod := reflect.Value{}
@@ -297,6 +311,7 @@ func (p configParser) ParseProxy(val string) {
 	method.Call(args)
 }
 
+// 使用反射方式对 rcFile 中的 listen=(val) 项进行处理
 func (p configParser) ParseListen(val string) {
 	if cmdHasListenAddr {
 		return
@@ -331,10 +346,12 @@ func (p configParser) ParseListen(val string) {
 	}
 }
 
+// 处理 logFile 路径
 func (p configParser) ParseLogFile(val string) {
 	config.LogFile = expandTilde(val)
 }
 
+// 处理与 PAC 相关的监听参数
 func (p configParser) ParseAddrInPAC(val string) {
 	configNeedUpgrade = true
 	arr := strings.Split(val, ",")
@@ -358,12 +375,14 @@ func (p configParser) ParseAddrInPAC(val string) {
 	}
 }
 
+// 处理上游为 socks5 的代理
 func (p configParser) ParseSocksParent(val string) {
 	var pp proxyParser
 	pp.ProxySocks5(val)
 	configNeedUpgrade = true
 }
 
+// 处理上游为 http 代理
 var http struct {
 	parent    *httpParent
 	serverCnt int
@@ -381,6 +400,7 @@ func (p configParser) ParseHttpParent(val string) {
 	configNeedUpgrade = true
 }
 
+// 处理http代理的用户名与密码
 func (p configParser) ParseHttpUserPasswd(val string) {
 	if !isUserPasswdValid(val) {
 		Fatal("httpUserPassword syntax wrong, should be in the form of user:passwd")
@@ -392,6 +412,7 @@ func (p configParser) ParseHttpUserPasswd(val string) {
 	http.passwdCnt++
 }
 
+// 处理 LB 配置参数
 func (p configParser) ParseLoadBalance(val string) {
 	switch val {
 	case "backup":
@@ -405,6 +426,7 @@ func (p configParser) ParseLoadBalance(val string) {
 	}
 }
 
+// 处理直连配置文件参数
 func (p configParser) ParseDirectFile(val string) {
 	config.DirectFile = expandTilde(val)
 	if err := isFileExists(config.DirectFile); err != nil {
@@ -412,6 +434,7 @@ func (p configParser) ParseDirectFile(val string) {
 	}
 }
 
+// 处理必须代理配置文件参数
 func (p configParser) ParseProxyFile(val string) {
 	config.ProxyFile = expandTilde(val)
 	if err := isFileExists(config.ProxyFile); err != nil {
@@ -421,7 +444,7 @@ func (p configParser) ParseProxyFile(val string) {
 
 // Put actual authentication related config parsing in auth.go, so config.go
 // doesn't need to know the details of authentication implementation.
-
+// 处理用户名与密码参数
 func (p configParser) ParseUserPasswd(val string) {
 	config.UserPasswd = val
 	if !isUserPasswdValid(config.UserPasswd) {
@@ -429,6 +452,7 @@ func (p configParser) ParseUserPasswd(val string) {
 	}
 }
 
+// 处理用户名与密码参数文件参数
 func (p configParser) ParseUserPasswdFile(val string) {
 	err := isFileExists(val)
 	if err != nil {
@@ -437,44 +461,54 @@ func (p configParser) ParseUserPasswdFile(val string) {
 	config.UserPasswdFile = val
 }
 
+// 处理客户端ACL
 func (p configParser) ParseAllowedClient(val string) {
 	config.AllowedClient = val
 }
 
+// 处理认证超时参数
 func (p configParser) ParseAuthTimeout(val string) {
 	config.AuthTimeout = parseDuration(val, "authTimeout")
 }
 
+// 处理几核处理器参数
 func (p configParser) ParseCore(val string) {
 	config.Core = parseInt(val, "core")
 }
 
+// 处理 http error code 参数
 func (p configParser) ParseHttpErrorCode(val string) {
 	config.HttpErrorCode = parseInt(val, "httpErrorCode")
 }
 
+// 处理读取超时参数
 func (p configParser) ParseReadTimeout(val string) {
 	config.ReadTimeout = parseDuration(val, "readTimeout")
 }
 
+// 处理拨号超时参数
 func (p configParser) ParseDialTimeout(val string) {
 	config.DialTimeout = parseDuration(val, "dialTimeout")
 }
 
+// 处理IP判断参数
 func (p configParser) ParseJudgeByIP(val string) {
 	config.JudgeByIP = parseBool(val, "judgeByIP")
 }
 
+// 处理证书参数
 func (p configParser) ParseCert(val string) {
 	config.Cert = val
 }
 
+// 处理私钥参数
 func (p configParser) ParseKey(val string) {
 	config.Key = val
 }
 
 // overrideConfig should contain options from command line to override options
 // in config file.
+// 用命令行参数覆盖配置文件相同参数
 func parseConfig(rc string, override *Config) {
 	// fmt.Println("rcFile:", path)
 	f, err := os.Open(expandTilde(rc))
@@ -531,6 +565,7 @@ func parseConfig(rc string, override *Config) {
 	}
 }
 
+// 升级配置文件 （？？？）
 func upgradeConfig(rc string, lines []string) {
 	newrc := rc + ".upgrade"
 	f, err := os.Create(newrc)
@@ -594,6 +629,7 @@ func upgradeConfig(rc string, lines []string) {
 	}
 }
 
+// 覆盖配置文件
 func overrideConfig(oldconfig, override *Config) {
 	newVal := reflect.ValueOf(override).Elem()
 	oldVal := reflect.ValueOf(oldconfig).Elem()
@@ -620,6 +656,7 @@ func overrideConfig(oldconfig, override *Config) {
 }
 
 // Must call checkConfig before using config.
+// 检查配置文件有效性
 func checkConfig() {
 	// listenAddr must be handled first, as addrInPAC dependends on this.
 	if listenProxy == nil {

@@ -5,10 +5,13 @@ import (
 )
 
 func ipShouldDirect(ip string) (direct bool) {
-	if strings.Contains(ip, ":") {
+
+	if strings.Contains(ip, ":") && !config.IPv6 {
 		// IPv6 addresses are connected directly
+		// IP为 IPv6 并且 IPv6 标识为 False，返回直连
 		return true
 	}
+
 	direct = false
 	defer func() {
 		if r := recover(); r != nil {

@@ -127,13 +127,16 @@ func (proxy *httpProxy) Addr() string {
 	return proxy.addr
 }
 
+// 代理主干函数
 func (hp *httpProxy) Serve(wg *sync.WaitGroup) {
 	var err error
 	var ln net.Listener
+
 	defer func() {
 		wg.Done()
 	}()
 
+	// 根据 hp.addr 启动监听进程 => ln
 	if hp.proto == "https" {
 		cert, err := tls.LoadX509KeyPair(config.Cert, config.Key)
 		if err != nil {
@@ -155,6 +158,8 @@ func (hp *httpProxy) Serve(wg *sync.WaitGroup) {
 		fmt.Println("listen", hp.proto, "failed:", err)
 		return
 	}
+
+	// 根据 host 参数，配置 pacURL
 	host, _, _ := net.SplitHostPort(hp.addr)
 	var pacURL string
 	if host == "" || host == "0.0.0.0" {
@@ -166,6 +171,7 @@ func (hp *httpProxy) Serve(wg *sync.WaitGroup) {
 	}
 	info.Printf("listen %s %s, PAC url %s\n", hp.proto, hp.addr, pacURL)
 
+	// 等待客户端连接，并进行代理处理
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -582,6 +588,7 @@ func (c *clientConn) readResponse(sv *serverConn, r *Request, rp *Response) (err
 	return
 }
 
+// getServerConn: 连接远端服务器，获得指定URL的内容
 func (c *clientConn) getServerConn(r *Request) (*serverConn, error) {
 	domainType := domainList.judge(r.URL)
 	// For CONNECT method, always create new connection.
@@ -614,6 +621,8 @@ func (c *clientConn) getServerConn(r *Request) (*serverConn, error) {
 func connectDirect2(url *URL, recursive bool) (net.Conn, error) {
 	var c net.Conn
 	var err error
+
+	// 直接测试断点
 	c, err = net.Dial("tcp", url.HostPort)
 	if err != nil {
 		debug.Printf("error direct connect to: %s %v\n", url.HostPort, err)
@@ -677,7 +686,7 @@ func (c *clientConn) connect(r *Request, direct bool) (srvconn net.Conn, err err
 		goto fail
 	}
 
-	// “我向来是不惮以最坏的恶意来揣测中国人的”
+	// 使用代理进行连接
 	dbgPrintRq(c, r, false)
 	if srvconn, err = parentProxy.connect(r.URL); err == nil {
 		return

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"sync"
 )
@@ -10,16 +9,13 @@ import (
 func main() {
 	// Parse flags after load config to allow override options in config
 	cmdLineConfig := parseCmdLineConfig()
-	if cmdLineConfig.PrintVer {
-		printVersion()
-		os.Exit(0)
-	}
 
 	fmt.Printf(`
-       /\
-   )  ( ')     MEOW Proxy %s
-  (  /  )      http://renzhn.github.io/MEOW/
-   \(__)|      
+       /\      MEOW Proxy %s
+   )  ( ')     https://renzhn.github.io/MEOW/
+  (  /  )      https://github.com/netheril96/MEOW
+  \ (__)|      https://github.com/sastation/MEOW
+
 	`, version)
 	fmt.Println()
 

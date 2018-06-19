@@ -237,6 +237,7 @@ func getUserHomeDir() string {
 	return home
 }
 
+// 对路径的 “~/” 进行扩展处理
 func expandTilde(pth string) string {
 	if len(pth) > 0 && pth[0] == '~' {
 		home := getUserHomeDir()

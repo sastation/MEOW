@@ -64,6 +64,9 @@ func (cp *ConnPool) Get(hostPort string, direct bool) (sv *serverConn) {
 	// Get from site specific connection first.
 	// Direct connection are all site specific, so must use site specific
 	// first to avoid using parent proxy for direct sites.
+
+	// RLock: sync.RWMutex 中的读锁
+	// RUnlock: sync.RWMutex 中的取消读锁
 	cp.RLock()
 	ch := cp.idleConn[hostPort]
 	cp.RUnlock()
