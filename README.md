@@ -1,6 +1,6 @@
 # MEOW Proxy
 
-当前版本：1.5 [CHANGELOG](CHANGELOG.md)
+当前版本：1.6 [CHANGELOG](CHANGELOG.md)
 [![Build Status](https://travis-ci.org/netheril96/MEOW.png?branch=master)](https://travis-ci.org/netheril96/MEOW)
 
 <pre>
@@ -10,10 +10,11 @@
    \(__)|      国内网站直接连接，其他的网站使用代理连接
 </pre>
 
-## 与原版MEOW的差别
-
-* 本代码仓库删除了编译好的二进制文件，大大减少了git clone时的传输大小
-* IPv6一律走直连（对于教育网用户很有用）
+## 与netheril96版MEOW的差别
+* IPv6可以选择是否走代理
+* 去除内建的 ssh 代理、shadowsocks 代理、meow-ss 代理 （simple is the best)
+* 所有配置文件默认统一为 meow 执行文件所在目录，所有配置文件后缀为 "*.conf"
+* 在配置文件中增加 DProxy 参数，用于指定国内IP走的代理设置，用于某些特殊场合
 
 ## MEOW 可以用来
 - 作为全局 HTTP 代理（支持 PAC），可以智能分流（直连国内网站、使用代理连接其他网站）
@@ -23,11 +24,11 @@
 
 ## 获取
 
-- **从源码安装:** 安装 [Go](http://golang.org/doc/install)，然后 `go get github.com/netheril96/MEOW`
+- **从源码安装:** 安装 [Go](http://golang.org/doc/install)，然后 `go get github.com/sastation/MEOW`
 
 ## 配置
 
-编辑 `~/.meow/rc` (OS X, Linux) 或 `rc.txt` (Windows)，例子：
+编辑 `./rc.conf`，例子：
 
     # 监听地址，设为0.0.0.0可以监听所有端口，共享给局域网使用
     listen = http://127.0.0.1:4411
@@ -36,10 +37,10 @@
     # proxy = socks5://127.0.0.1:1080
     # HTTP 上级代理
     # proxy = http://127.0.0.1:8087
-    # shadowsocks 上级代理
-    # proxy = ss://aes-128-cfb:password@example.server.com:25
     # HTTPS 上级代理
     # proxy = https://user:password@example.server.com:port
+    # 直连所用代理
+    # DProxy = https://127.0.0.1:8088
 
 ## 工作方式
 
@@ -51,12 +52,15 @@
 - 检查域名是否在强制使用代理列表中，如果在则通过代理连接
 - **检查域名的 IP 是否为国内 IP**
     - 通过本地 DNS 解析域名，得到域名的 IP
-    - 如果是国内 IP 则直连，否则通过代理连接
+    - 如果是国内 IP: 
+        + 若有 DProxy 参数，则走 DProxy 指定的代理
+        + 若无 DProxy 参数，则直连
+    - 如果不是国内 IP，则走 "proxy" 参数指定的代理
     - 将域名加入临时的直连或者强制使用代理列表，下次可以不用 DNS 解析直接判断域名是否直连
 
 ## 直连列表
 
-直接连接的域名列表保存在 `~/.meow/direct` (OS X, Linux) 或 `direct.txt` (Windows)
+直接连接的域名列表保存在 `./direct.conf` 
 
 匹配域名**按 . 分隔的后两部分**或者**整个域名**，例子：
 
@@ -69,13 +73,14 @@
 
 ## 强制使用代理列表
 
-强制使用代理连接的域名列表保存在 `~/.meow/proxy` (OS X, Linux) 或 `proxy.txt` (Windows)，语法格式与直连列表相同
+强制使用代理连接的域名列表保存在 `./proxy.conf`，语法格式与直连列表相同
 （注意：匹配的是域名**按 . 分隔的后两部分**或者**整个域名**）
 
 ## 致谢
 
 - @cyfdecyf - COW author
 - @renzhn - Original MEOW author
+- @netheril96 - MEOW v1.5 author
 - Github - Github Student Pack
 - https://www.pandafan.org/pac/index.html - Domain White List
 - https://github.com/Leask/Flora_Pac - CN IP Data

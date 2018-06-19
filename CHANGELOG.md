@@ -1,4 +1,18 @@
 ## 更新说明
+- 2018-06-19 Version 1.6.0
+       * change config file suffix to *.conf
+       * add run.doc
+       * remove ssh proxy function
+       * remove proxy function of shadowsocks & meow-ss 
+       * add ipv6 option to use ipv6 proxy (command line)
+       * add more comments 
+       * add directProxy function
+       * update chinaip_data
+       * change version to 1.6.0
+       * change version info
+       * update README.md
+       * update CHANGELOG.md
+       
 - 2016-09-29 Version 1.5
 
        * 更新中国IP列表
