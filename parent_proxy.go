@@ -14,8 +14,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
-	ss "github.com/shadowsocks/shadowsocks-go/shadowsocks"
 )
 
 // Interface that all types of parent proxies should support.
@@ -70,14 +68,10 @@ func printParentProxy(parent []ParentWithFail) {
 	debug.Println("avaiable parent proxies:")
 	for _, pp := range parent {
 		switch pc := pp.ParentProxy.(type) {
-		case *shadowsocksParent:
-			debug.Println("\tshadowsocks: ", pc.server)
 		case *httpParent:
 			debug.Println("\thttp parent: ", pc.server)
 		case *socksParent:
 			debug.Println("\tsocks parent: ", pc.server)
-		case *meowParent:
-			debug.Println("\tmeow parent: ", pc.server)
 		}
 	}
 }
@@ -417,114 +411,6 @@ func (hp *httpParent) connect(url *URL) (net.Conn, error) {
 	debug.Printf("connected to: %s via http parent: %s\n",
 		url.HostPort, hp.server)
 	return httpConn{c, hp}, nil
-}
-
-// shadowsocks parent proxy
-type shadowsocksParent struct {
-	server string
-	method string // method and passwd are for upgrade config
-	passwd string
-	cipher *ss.Cipher
-}
-
-type shadowsocksConn struct {
-	net.Conn
-	parent *shadowsocksParent
-}
-
-func (s shadowsocksConn) String() string {
-	return "shadowsocks proxy " + s.parent.server
-}
-
-// In order to use parent proxy in the order specified in the config file, we
-// insert an uninitialized proxy into parent proxy list, and initialize it
-// when all its config have been parsed.
-
-func newShadowsocksParent(server string) *shadowsocksParent {
-	return &shadowsocksParent{server: server}
-}
-
-func (sp *shadowsocksParent) getServer() string {
-	return sp.server
-}
-
-func (sp *shadowsocksParent) genConfig() string {
-	method := sp.method
-	if method == "" {
-		method = "table"
-	}
-	return fmt.Sprintf("proxy = ss://%s:%s@%s", method, sp.passwd, sp.server)
-}
-
-func (sp *shadowsocksParent) initCipher(method, passwd string) {
-	sp.method = method
-	sp.passwd = passwd
-	cipher, err := ss.NewCipher(method, passwd)
-	if err != nil {
-		Fatal("create shadowsocks cipher:", err)
-	}
-	sp.cipher = cipher
-}
-
-func (sp *shadowsocksParent) connect(url *URL) (net.Conn, error) {
-	c, err := ss.Dial(url.HostPort, sp.server, sp.cipher.Copy())
-	if err != nil {
-		errl.Printf("can't connect to shadowsocks parent %s for %s: %v\n",
-			sp.server, url.HostPort, err)
-		return nil, err
-	}
-	debug.Println("connected to:", url.HostPort, "via shadowsocks:", sp.server)
-	return shadowsocksConn{c, sp}, nil
-}
-
-// meow parent proxy
-type meowParent struct {
-	server string
-	method string
-	passwd string
-	cipher *ss.Cipher
-}
-
-type meowConn struct {
-	net.Conn
-	parent *meowParent
-}
-
-func (s meowConn) String() string {
-	return "meow proxy " + s.parent.server
-}
-
-func newMeowParent(srv, method, passwd string) *meowParent {
-	cipher, err := ss.NewCipher(method, passwd)
-	if err != nil {
-		Fatal("create meow cipher:", err)
-	}
-	return &meowParent{srv, method, passwd, cipher}
-}
-
-func (cp *meowParent) getServer() string {
-	return cp.server
-}
-
-func (cp *meowParent) genConfig() string {
-	method := cp.method
-	if method == "" {
-		method = "table"
-	}
-	return fmt.Sprintf("proxy = meow://%s:%s@%s", method, cp.passwd, cp.server)
-}
-
-func (cp *meowParent) connect(url *URL) (net.Conn, error) {
-	c, err := net.Dial("tcp", cp.server)
-	if err != nil {
-		errl.Printf("can't connect to meow parent %s for %s: %v\n",
-			cp.server, url.HostPort, err)
-		return nil, err
-	}
-	debug.Printf("connected to: %s via meow parent: %s\n",
-		url.HostPort, cp.server)
-	ssconn := ss.NewConn(c, cp.cipher.Copy())
-	return meowConn{ssconn, cp}, nil
 }
 
 // For socks documentation, refer to rfc 1928 http://www.ietf.org/rfc/rfc1928.txt

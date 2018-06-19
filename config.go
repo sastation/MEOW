@@ -250,32 +250,6 @@ func parseMethodPasswdServer(val string) (method, passwd, server string, err err
 	return
 }
 
-// parse shadowsocks proxy
-func (p proxyParser) ProxySs(val string) {
-	method, passwd, server, err := parseMethodPasswdServer(val)
-	if err != nil {
-		Fatal("shadowsocks parent", err)
-	}
-	parent := newShadowsocksParent(server)
-	parent.initCipher(method, passwd)
-	parentProxy.add(parent)
-}
-
-func (p proxyParser) ProxyMeow(val string) {
-	method, passwd, server, err := parseMethodPasswdServer(val)
-	if err != nil {
-		Fatal("meow parent", err)
-	}
-
-	if err := checkServerAddr(server); err != nil {
-		Fatal("parent meow server", err)
-	}
-
-	config.saveReqLine = true
-	parent := newMeowParent(server, method, passwd)
-	parentProxy.add(parent)
-}
-
 // listenParser provides functions to parse different types of listen addresses
 type listenParser struct{}
 
@@ -299,17 +273,6 @@ func (lp listenParser) ListenHttp(val string, proto string) {
 		Fatal("listen", proto, "server", err)
 	}
 	addListenProxy(newHttpProxy(addr, addrInPAC, proto))
-}
-
-func (lp listenParser) ListenMeow(val string) {
-	if cmdHasListenAddr {
-		return
-	}
-	method, passwd, addr, err := parseMethodPasswdServer(val)
-	if err != nil {
-		Fatal("listen meow", err)
-	}
-	addListenProxy(newMeowProxy(method, passwd, addr))
 }
 
 // configParser provides functions to parse options in config file.
@@ -454,72 +417,6 @@ func (p configParser) ParseProxyFile(val string) {
 	if err := isFileExists(config.ProxyFile); err != nil {
 		Fatal("proxy file:", err)
 	}
-}
-
-var shadow struct {
-	parent *shadowsocksParent
-	passwd string
-	method string
-
-	serverCnt int
-	passwdCnt int
-	methodCnt int
-}
-
-func (p configParser) ParseShadowSocks(val string) {
-	if shadow.serverCnt-shadow.passwdCnt > 1 {
-		Fatal("must specify shadowPasswd for every shadowSocks server")
-	}
-	// create new shadowsocks parent if both server and password are given
-	// previously
-	if shadow.parent != nil && shadow.serverCnt == shadow.passwdCnt {
-		if shadow.methodCnt < shadow.serverCnt {
-			shadow.method = ""
-			shadow.methodCnt = shadow.serverCnt
-		}
-		shadow.parent.initCipher(shadow.method, shadow.passwd)
-	}
-	if val == "" { // the final call
-		shadow.parent = nil
-		return
-	}
-	if err := checkServerAddr(val); err != nil {
-		Fatal("shadowsocks server", err)
-	}
-	shadow.parent = newShadowsocksParent(val)
-	parentProxy.add(shadow.parent)
-	shadow.serverCnt++
-	configNeedUpgrade = true
-}
-
-func (p configParser) ParseShadowPasswd(val string) {
-	if shadow.passwdCnt >= shadow.serverCnt {
-		Fatal("must specify shadowSocks before corresponding shadowPasswd")
-	}
-	if shadow.passwdCnt+1 != shadow.serverCnt {
-		Fatal("must specify shadowPasswd for every shadowSocks")
-	}
-	shadow.passwd = val
-	shadow.passwdCnt++
-}
-
-func (p configParser) ParseShadowMethod(val string) {
-	if shadow.methodCnt >= shadow.serverCnt {
-		Fatal("must specify shadowSocks before corresponding shadowMethod")
-	}
-	// shadowMethod is optional
-	shadow.method = val
-	shadow.methodCnt++
-}
-
-func checkShadowsocks() {
-	if shadow.serverCnt != shadow.passwdCnt {
-		Fatal("number of shadowsocks server and password does not match")
-	}
-	// parse the last shadowSocks option again to initialize the last
-	// shadowsocks server
-	parser := configParser{}
-	parser.ParseShadowSocks("")
 }
 
 // Put actual authentication related config parsing in auth.go, so config.go
@@ -724,7 +621,6 @@ func overrideConfig(oldconfig, override *Config) {
 
 // Must call checkConfig before using config.
 func checkConfig() {
-	checkShadowsocks()
 	// listenAddr must be handled first, as addrInPAC dependends on this.
 	if listenProxy == nil {
 		listenProxy = []Proxy{newHttpProxy(defaultListenAddr, "", "http")}

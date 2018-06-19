@@ -7,15 +7,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
 	"sync"
-	"time"
-	"os"
 	"syscall"
+	"time"
 
 	"github.com/cyfdecyf/bufio"
 	"github.com/cyfdecyf/leakybuf"
-	ss "github.com/shadowsocks/shadowsocks-go/shadowsocks"
 )
 
 // As I'm using ReadSlice to read line, it's possible to get
@@ -182,60 +181,6 @@ func (hp *httpProxy) Serve(wg *sync.WaitGroup) {
 	}
 }
 
-type meowProxy struct {
-	addr   string
-	method string
-	passwd string
-	cipher *ss.Cipher
-}
-
-func newMeowProxy(method, passwd, addr string) *meowProxy {
-	cipher, err := ss.NewCipher(method, passwd)
-	if err != nil {
-		Fatal("can't initialize meow proxy server", err)
-	}
-	return &meowProxy{addr, method, passwd, cipher}
-}
-
-func (cp *meowProxy) genConfig() string {
-	method := cp.method
-	if method == "" {
-		method = "table"
-	}
-	return fmt.Sprintf("listen = meow://%s:%s@%s", method, cp.passwd, cp.addr)
-}
-
-func (cp *meowProxy) Addr() string {
-	return cp.addr
-}
-
-func (cp *meowProxy) Serve(wg *sync.WaitGroup) {
-	defer func() {
-		wg.Done()
-	}()
-	ln, err := net.Listen("tcp", cp.addr)
-	if err != nil {
-		fmt.Println("listen meow failed:", err)
-		return
-	}
-	info.Printf("meow proxy address %s\n", cp.addr)
-
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			errl.Printf("meow proxy(%s) accept %v\n", ln.Addr(), err)
-			if isErrTooManyOpenFd(err) {
-				connPool.CloseAll()
-			}
-			time.Sleep(time.Millisecond)
-			continue
-		}
-		ssConn := ss.NewConn(conn, cp.cipher.Copy())
-		c := newClientConn(ssConn, cp)
-		go c.serve()
-	}
-}
-
 func newClientConn(cli net.Conn, proxy Proxy) *clientConn {
 	buf := httpBuf.Get()
 	c := &clientConn{
@@ -270,19 +215,12 @@ func (c *clientConn) Close() {
 }
 
 func (c *clientConn) setReadTimeout(msg string) {
-	// Always keep connections alive for meow conn from client for more reuse.
-	// For other client connections, set read timeout so we can close the
-	// connection after a period of idle to reduce number of open connections.
-	if _, ok := c.Conn.(*ss.Conn); !ok {
-		// make actual timeout a little longer than keep-alive value sent to client
-		setConnReadTimeout(c.Conn, clientConnTimeout+2*time.Second, msg)
-	}
+	setConnReadTimeout(c.Conn, clientConnTimeout+2*time.Second, msg)
+
 }
 
 func (c *clientConn) unsetReadTimeout(msg string) {
-	if _, ok := c.Conn.(*ss.Conn); !ok {
-		unsetConnReadTimeout(c.Conn, msg)
-	}
+	unsetConnReadTimeout(c.Conn, msg)
 }
 
 func setConnReadTimeout(cn net.Conn, d time.Duration, msg string) {
@@ -405,10 +343,6 @@ func (c *clientConn) serve() {
 	var err error
 
 	var authed bool
-	// For meow proxy server, authentication is done by matching password.
-	if _, ok := c.proxy.(*meowProxy); ok {
-		authed = true
-	}
 
 	defer func() {
 		r.releaseBuf()
@@ -504,8 +438,7 @@ func (c *clientConn) serve() {
 			return
 		}
 		// Put server connection to pool, so other clients can use it.
-		_, isMeowConn := sv.Conn.(meowConn)
-		if rp.ConnectionKeepAlive || isMeowConn {
+		if rp.ConnectionKeepAlive {
 			if debug {
 				debug.Printf("cli(%s) connPool put %s", c.RemoteAddr(), sv.hostPort)
 			}
@@ -812,10 +745,6 @@ func (sv *serverConn) Close() error {
 }
 
 func (sv *serverConn) mayBeClosed() bool {
-	if _, ok := sv.Conn.(meowConn); ok {
-		debug.Println("meow parent would keep alive")
-		return false
-	}
 	return time.Now().After(sv.willCloseOn)
 }
 
@@ -946,8 +875,7 @@ func (sv *serverConn) doConnect(r *Request, c *clientConn) (err error) {
 
 	_, isHttpConn := sv.Conn.(httpConn)
 	_, isHttpsConn := sv.Conn.(httpsConn)
-	_, isMeowConn := sv.Conn.(meowConn)
-	if isHttpConn || isHttpsConn || isMeowConn {
+	if isHttpConn || isHttpsConn {
 		if debug {
 			debug.Printf("cli(%s) send CONNECT request to parent\n", c.RemoteAddr())
 		}
@@ -1025,7 +953,7 @@ func (sv *serverConn) sendHTTPProxyRequestHeader(r *Request, c *clientConn) (err
 func (sv *serverConn) sendRequestHeader(r *Request, c *clientConn) (err error) {
 	// Send request to the server
 	switch sv.Conn.(type) {
-	case httpConn, httpsConn, meowConn:
+	case httpConn, httpsConn:
 		return sv.sendHTTPProxyRequestHeader(r, c)
 	}
 	/*
