@@ -17,7 +17,7 @@ import (
 
 // 版本号、默认监听端口
 const (
-	version           = "1.5.2.3-dev"
+	version           = "1.6.0"
 	defaultListenAddr = "127.0.0.1:4411"
 )
 
