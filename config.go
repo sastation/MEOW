@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	version           = "1.6.dev"
+	version           = "1.5.2"
 	defaultListenAddr = "127.0.0.1:4411"
 )
 
@@ -35,8 +35,6 @@ type Config struct {
 	LogFile     string // path for log file
 	JudgeByIP   bool
 	LoadBalance LoadBalanceMode // select load balance mode
-
-	SshServer []string
 
 	// authenticate client
 	UserPasswd     string
@@ -89,6 +87,7 @@ func initConfig(rcFile string) {
 // Whether command line options specifies listen addr
 var cmdHasListenAddr bool
 
+// 获取命令行参数
 func parseCmdLineConfig() *Config {
 	var c Config
 	var listenAddr string
@@ -137,6 +136,7 @@ func parseBool(v, msg string) bool {
 	return false
 }
 
+// convert string to int
 func parseInt(val, msg string) (i int) {
 	var err error
 	if i, err = strconv.Atoi(val); err != nil {
@@ -145,6 +145,7 @@ func parseInt(val, msg string) (i int) {
 	return
 }
 
+// convert string to time.duration
 func parseDuration(val, msg string) (d time.Duration) {
 	var err error
 	if d, err = time.ParseDuration(val); err != nil {
@@ -153,11 +154,13 @@ func parseDuration(val, msg string) (d time.Duration) {
 	return
 }
 
+// 检查是否符合 host:port 格式
 func checkServerAddr(addr string) error {
 	_, _, err := net.SplitHostPort(addr)
 	return err
 }
 
+// 是否为 user:password 格式
 func isUserPasswdValid(val string) bool {
 	arr := strings.SplitN(val, ":", 2)
 	if len(arr) != 2 || arr[0] == "" || arr[1] == "" {
@@ -167,6 +170,7 @@ func isUserPasswdValid(val string) bool {
 }
 
 // proxyParser provides functions to parse different types of parent proxy
+// proxyParser 解析各种上层代理的方法集合类
 type proxyParser struct{}
 
 func (p proxyParser) ProxySocks5(val string) {
@@ -176,7 +180,7 @@ func (p proxyParser) ProxySocks5(val string) {
 	parentProxy.add(newSocksParent(val))
 }
 
-func (pp proxyParser) ProxyHttp(val string) {
+func (p proxyParser) ProxyHttp(val string) {
 	var userPasswd, server string
 
 	idx := strings.LastIndex(val, "@")
@@ -198,7 +202,7 @@ func (pp proxyParser) ProxyHttp(val string) {
 	parentProxy.add(parent)
 }
 
-func (pp proxyParser) ProxyHttps(val string) {
+func (p proxyParser) ProxyHttps(val string) {
 	var userPasswd, server string
 
 	idx := strings.LastIndex(val, "@")
@@ -247,7 +251,7 @@ func parseMethodPasswdServer(val string) (method, passwd, server string, err err
 }
 
 // parse shadowsocks proxy
-func (pp proxyParser) ProxySs(val string) {
+func (p proxyParser) ProxySs(val string) {
 	method, passwd, server, err := parseMethodPasswdServer(val)
 	if err != nil {
 		Fatal("shadowsocks parent", err)
@@ -257,7 +261,7 @@ func (pp proxyParser) ProxySs(val string) {
 	parentProxy.add(parent)
 }
 
-func (pp proxyParser) ProxyMeow(val string) {
+func (p proxyParser) ProxyMeow(val string) {
 	method, passwd, server, err := parseMethodPasswdServer(val)
 	if err != nil {
 		Fatal("meow parent", err)
@@ -395,22 +399,6 @@ func (p configParser) ParseSocksParent(val string) {
 	var pp proxyParser
 	pp.ProxySocks5(val)
 	configNeedUpgrade = true
-}
-
-func (p configParser) ParseSshServer(val string) {
-	arr := strings.Split(val, ":")
-	if len(arr) == 2 {
-		val += ":22"
-	} else if len(arr) == 3 {
-		if arr[2] == "" {
-			val += "22"
-		}
-	} else {
-		Fatal("sshServer should be in the form of: user@server:local_socks_port[:server_ssh_port]")
-	}
-	// add created socks server
-	p.ParseSocksParent("127.0.0.1:" + arr[1])
-	config.SshServer = append(config.SshServer, val)
 }
 
 var http struct {

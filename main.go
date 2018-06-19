@@ -40,8 +40,6 @@ func main() {
 		runtime.GOMAXPROCS(config.Core)
 	}
 
-	go runSSH()
-
 	var wg sync.WaitGroup
 	wg.Add(len(listenProxy))
 	for _, proxy := range listenProxy {
