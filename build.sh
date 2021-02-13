@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "Refresh chinaip data..."
+go run china.ip/chinaip_gen.go
+
 echo "Building win-amd64..."
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o meow-windows-amd64
 echo "Building linux-amd64..."
