@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# don't forget to modify config.go for version info"
+
 echo "Refresh chinaip data..."
 go run china.ip/chinaip_gen.go
 
